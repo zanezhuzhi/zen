@@ -4,6 +4,11 @@
 .obsidian/backups/
 .obsidian/plugins/*/main.js
 .obsidian/plugins/*/styles.css
+.obsidian/plugins/*/data.json
+!.obsidian/plugins/templater-obsidian/data.json
+.obsidian/types.json
+.claudian/
+Knomo/_knomo-system/
 .trash/
 
 # Secrets and local service config

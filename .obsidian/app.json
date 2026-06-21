@@ -1,3 +1,6 @@
 {
-  "safeMode": false
+  "safeMode": false,
+  "userIgnoreFilters": [
+    "Knomo/_knomo-system/"
+  ]
 }

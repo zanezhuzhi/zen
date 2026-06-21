@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
-import html
 import json
 import logging
 import os
-import re
 import sys
 import uuid
 from pathlib import Path
@@ -16,6 +14,16 @@ from dotenv import load_dotenv
 import lark_oapi as lark
 from lark_oapi.api.im.v1 import P2ImMessageReceiveV1
 from lark_oapi.api.im.v1 import ReplyMessageRequest, ReplyMessageRequestBody
+
+from inbox_utils import (
+    clean_text,
+    content_to_text,
+    decode_content,
+    extract_urls,
+    markdown_escape_block,
+    normalize_content,
+    parse_daily_entries,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -47,30 +55,6 @@ def now_local() -> dt.datetime:
     return dt.datetime.now().astimezone()
 
 
-def decode_content(raw: str | None) -> dict[str, Any]:
-    if not raw:
-        return {}
-    try:
-        value = json.loads(raw)
-        return value if isinstance(value, dict) else {"raw": value}
-    except Exception:
-        return {"raw": raw}
-
-
-def content_to_text(message_type: str | None, content: dict[str, Any]) -> str:
-    if message_type == "text":
-        return str(content.get("text", "")).strip()
-    if message_type == "post":
-        return json.dumps(content, ensure_ascii=False, indent=2)
-    if "text" in content:
-        return str(content.get("text", "")).strip()
-    return json.dumps(content, ensure_ascii=False, indent=2)
-
-
-def extract_urls(text: str) -> list[str]:
-    return re.findall(r"https?://[^\s<>\"]+", text)
-
-
 def get_sender_id(event: P2ImMessageReceiveV1) -> str:
     sender = getattr(event.event, "sender", None)
     sender_id = getattr(sender, "sender_id", None)
@@ -81,14 +65,35 @@ def get_sender_id(event: P2ImMessageReceiveV1) -> str:
     return ""
 
 
-def append_event_to_daily_note(event: P2ImMessageReceiveV1) -> Path:
+def has_duplicate_url(note_path: Path, canonical_url: str) -> bool:
+    if not canonical_url or not note_path.exists():
+        return False
+    try:
+        for entry in parse_daily_entries(note_path):
+            normalized = entry["normalized"]
+            if normalized.canonical_url == canonical_url:
+                return True
+    except Exception:
+        logging.exception("failed to scan duplicate url in %s", note_path)
+    return False
+
+
+def append_event_to_daily_note(event: P2ImMessageReceiveV1) -> tuple[Path, bool, str]:
     received_at = now_local()
     message = event.event.message
     sender = event.event.sender
     content = decode_content(message.content)
     text = content_to_text(message.message_type, content)
-    urls = extract_urls(text)
+    normalized = normalize_content(message.message_type, content)
+    link_candidates = []
+    if normalized.canonical_url:
+        link_candidates.append(normalized.canonical_url)
+    if normalized.url:
+        link_candidates.append(normalized.url)
+    link_candidates.extend(extract_urls(text))
+    urls = list(dict.fromkeys(link_candidates))
     note_path = INBOX_DIR / f"{received_at:%Y-%m-%d}.md"
+    duplicate_url = has_duplicate_url(note_path, normalized.canonical_url)
 
     if not note_path.exists():
         note_path.write_text(f"# 飞书同步 {received_at:%Y-%m-%d}\n\n", encoding="utf-8")
@@ -103,14 +108,39 @@ def append_event_to_daily_note(event: P2ImMessageReceiveV1) -> Path:
         f"- chat_type: `{message.chat_type or ''}`",
         f"- sender_type: `{getattr(sender, 'sender_type', '')}`",
         f"- sender_id: `{get_sender_id(event)}`",
-        f"- status: received",
+        f"- status: {'duplicate' if duplicate_url else 'received'}",
+        f"- title: {normalized.title}",
+        f"- source: {normalized.source or '-'}",
+        f"- suggested_domain: {', '.join(normalized.domains)}",
+        f"- suggested_action: {normalized.suggested_action}",
     ]
+    if normalized.url:
+        lines.append(f"- url: {normalized.url}")
+    if normalized.canonical_url:
+        lines.append(f"- canonical_url: {normalized.canonical_url}")
+    if duplicate_url:
+        lines.append("- duplicate_hint: same canonical_url already exists today")
+
+    lines.extend(
+        [
+            "",
+            "### Summary",
+            f"- 标题：{normalized.title}",
+            f"- 来源：{normalized.source or '-'}",
+            f"- 领域：{', '.join(normalized.domains)}",
+            f"- 建议动作：{normalized.suggested_action}",
+        ]
+    )
+    if duplicate_url:
+        lines.append("- 重复：疑似重复链接，今日雷达只会保留第一条。")
+    if normalized.excerpt:
+        lines.append(f"- 摘要片段：{normalized.excerpt}")
     if urls:
         lines.extend(["", "### Links"])
-        lines.extend(f"- {item}" for item in sorted(set(urls)))
+        lines.extend(f"- {item}" for item in urls)
     lines.extend(["", "### Content"])
     if text:
-        lines.extend(["```text", html.unescape(text).replace("```", "` ` `"), "```"])
+        lines.extend(["```text", markdown_escape_block(clean_text(text)), "```"])
     else:
         lines.append("_empty_")
     lines.extend(["", "### Raw Content", "```json", json.dumps(content, ensure_ascii=False, indent=2), "```", ""])
@@ -119,7 +149,7 @@ def append_event_to_daily_note(event: P2ImMessageReceiveV1) -> Path:
         f.write("\n".join(lines))
         f.write("\n")
 
-    return note_path
+    return note_path, duplicate_url, normalized.title
 
 
 def make_api_client() -> lark.Client:
@@ -135,12 +165,16 @@ def make_api_client() -> lark.Client:
 api_client: lark.Client | None = None
 
 
-def reply_received(message_id: str) -> None:
+def reply_received(message_id: str, title: str = "", duplicate: bool = False) -> None:
     if not REPLY_ENABLED or not message_id:
         return
     global api_client
     if api_client is None:
         api_client = make_api_client()
+
+    reply_text = "已收录"
+    if title:
+        reply_text = f"已收录：{title[:36]} / {'疑似重复' if duplicate else '待处理'}"
 
     request = (
         ReplyMessageRequest.builder()
@@ -148,7 +182,7 @@ def reply_received(message_id: str) -> None:
         .request_body(
             ReplyMessageRequestBody.builder()
             .msg_type("text")
-            .content(json.dumps({"text": "已收录"}, ensure_ascii=False))
+            .content(json.dumps({"text": reply_text}, ensure_ascii=False))
             .uuid(str(uuid.uuid4()))
             .build()
         )
@@ -160,11 +194,11 @@ def reply_received(message_id: str) -> None:
 
 
 def on_message(event: P2ImMessageReceiveV1) -> None:
-    note_path = append_event_to_daily_note(event)
+    note_path, duplicate, title = append_event_to_daily_note(event)
     message_id = event.event.message.message_id or ""
     logging.info("saved feishu message %s to %s", message_id, note_path)
     try:
-        reply_received(message_id)
+        reply_received(message_id, title, duplicate)
     except Exception:
         logging.exception("reply failed")
 

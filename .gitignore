@@ -21,6 +21,7 @@ Knomo/_knomo-system/
 # Private raw inbox content
 00_入口收件箱/公众号同步/*.md
 00_入口收件箱/飞书同步/*.md
+00_入口收件箱/每日雷达/*.md
 00_入口收件箱/每日速记/*.md
 
 # Runtime artifacts

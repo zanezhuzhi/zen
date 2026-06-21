@@ -22,10 +22,13 @@ Knomo/_knomo-system/
 00_入口收件箱/公众号同步/*.md
 00_入口收件箱/飞书同步/*.md
 00_入口收件箱/每日雷达/*.md
+00_入口收件箱/每日信息候选/*.md
 00_入口收件箱/每日速记/*.md
 
 # Runtime artifacts
 90_系统/logs/
+90_系统/config/daily_collect_feedback.json
+90_系统/config/daily_collect_seen.json
 90_系统/**/.venv/
 90_系统/**/__pycache__/
 **/__pycache__/

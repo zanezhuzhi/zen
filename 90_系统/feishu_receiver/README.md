@@ -61,6 +61,8 @@ cd "D:\==我的学习库==\90_系统\feishu_receiver"
 - Windows 启动文件夹快捷方式 `启动飞书收件箱`：登录后启动。
 - Windows 计划任务 `Zen Feishu Inbox Receiver`：每 5 分钟检查一次，掉线后重新拉起。
 - Windows 计划任务 `Zen Daily Opportunity Radar`：每天 21:30 生成每日机会雷达。
+- Windows 计划任务 `Zen Daily Domain Brief`：每天 08:30 生成五领域信息候选。
+- Windows 计划任务 `Zen Daily Feedback Learning`：每天 23:10 读取你勾选的收录/移除反馈。
 - 桌面快捷方式 `启动飞书收件箱`。
 
 ## 5. 每日机会雷达
@@ -85,3 +87,25 @@ D:\==我的学习库==\00_入口收件箱\每日雷达\YYYY-MM-DD.md
 ```
 
 每日雷达是私有文件，默认不会提交到 GitHub。
+
+## 6. 每日五领域信息候选
+
+手动生成：
+
+```powershell
+cd "D:\==我的学习库==\90_系统\daily_collect"
+.\collect_daily_domains.ps1
+```
+
+输出位置：
+
+```text
+D:\==我的学习库==\00_入口收件箱\每日信息候选\YYYY-MM-DD.md
+```
+
+你可以在候选清单里勾选 `收录` 或 `移除`。晚上 23:10 会自动学习反馈；也可以手动运行：
+
+```powershell
+cd "D:\==我的学习库==\90_系统\daily_collect"
+.\apply_daily_feedback.ps1
+```

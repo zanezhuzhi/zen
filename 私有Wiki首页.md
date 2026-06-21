@@ -25,6 +25,15 @@ SORT file.name DESC
 LIMIT 7
 ```
 
+## 每日五领域信息候选
+```dataview
+TABLE file.mtime AS "生成时间", status AS "状态"
+FROM "00_入口收件箱/每日信息候选"
+WHERE type = "daily-domain-brief"
+SORT file.name DESC
+LIMIT 7
+```
+
 ## 本周待处理
 ```tasks
 not done

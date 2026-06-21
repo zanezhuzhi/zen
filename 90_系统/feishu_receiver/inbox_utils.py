@@ -13,6 +13,7 @@ TRACKING_PARAMS = {
     "app",
     "category_new",
     "module_name",
+    "oc",
     "req_id",
     "req_id_new",
     "share_did",

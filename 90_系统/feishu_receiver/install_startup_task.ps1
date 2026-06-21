@@ -2,14 +2,25 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $StartScript = Join-Path $ScriptDir "start_feishu_inbox.ps1"
 $RadarScript = Join-Path $ScriptDir "process_daily_inbox.ps1"
+$DailyCollectDir = Join-Path (Split-Path -Parent $ScriptDir) "daily_collect"
+$DomainBriefScript = Join-Path $DailyCollectDir "collect_daily_domains.ps1"
+$FeedbackScript = Join-Path $DailyCollectDir "apply_daily_feedback.ps1"
 $ReceiverTaskName = "Zen Feishu Inbox Receiver"
 $RadarTaskName = "Zen Daily Opportunity Radar"
+$DomainBriefTaskName = "Zen Daily Domain Brief"
+$FeedbackTaskName = "Zen Daily Feedback Learning"
 
 if (-not (Test-Path $StartScript)) {
     throw "Missing start script: $StartScript"
 }
 if (-not (Test-Path $RadarScript)) {
     throw "Missing radar script: $RadarScript"
+}
+if (-not (Test-Path $DomainBriefScript)) {
+    throw "Missing domain brief script: $DomainBriefScript"
+}
+if (-not (Test-Path $FeedbackScript)) {
+    throw "Missing feedback script: $FeedbackScript"
 }
 
 $ReceiverAction = New-ScheduledTaskAction `
@@ -50,6 +61,40 @@ Register-ScheduledTask `
     -Settings $RadarSettings `
     -Force | Out-Null
 
+$DomainBriefAction = New-ScheduledTaskAction `
+    -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$DomainBriefScript`""
+$DomainBriefTrigger = New-ScheduledTaskTrigger -Daily -At 08:30
+$DomainBriefSettings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable `
+    -MultipleInstances IgnoreNew
+
+Register-ScheduledTask `
+    -TaskName $DomainBriefTaskName `
+    -Action $DomainBriefAction `
+    -Trigger $DomainBriefTrigger `
+    -Settings $DomainBriefSettings `
+    -Force | Out-Null
+
+$FeedbackAction = New-ScheduledTaskAction `
+    -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$FeedbackScript`""
+$FeedbackTrigger = New-ScheduledTaskTrigger -Daily -At 23:10
+$FeedbackSettings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable `
+    -MultipleInstances IgnoreNew
+
+Register-ScheduledTask `
+    -TaskName $FeedbackTaskName `
+    -Action $FeedbackAction `
+    -Trigger $FeedbackTrigger `
+    -Settings $FeedbackSettings `
+    -Force | Out-Null
+
 function New-PowerShellShortcut {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -83,5 +128,7 @@ New-PowerShellShortcut `
 
 Write-Host "Installed scheduled task: $ReceiverTaskName"
 Write-Host "Installed scheduled task: $RadarTaskName"
+Write-Host "Installed scheduled task: $DomainBriefTaskName"
+Write-Host "Installed scheduled task: $FeedbackTaskName"
 Write-Host "Created startup shortcut: $StartupShortcutPath"
 Write-Host "Created desktop shortcut: $ShortcutPath"

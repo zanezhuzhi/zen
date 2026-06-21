@@ -1,0 +1,46 @@
+site_name: Zane 的知识库
+site_description: 互联网、AI、游戏、投资方向的公开知识沉淀
+site_url: https://zanezhuzhi.github.io/zen/
+repo_url: https://github.com/zanezhuzhi/zen
+repo_name: zanezhuzhi/zen
+docs_dir: public
+site_dir: site
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.action.edit
+    - content.code.copy
+
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - 首页: index.md
+  - 工作流: workflow.md
+  - 领域:
+      - 互联网: domains/internet.md
+      - AI: domains/ai.md
+      - 游戏: domains/game.md
+      - 投资: domains/investment.md
+      - 写作: domains/writing.md

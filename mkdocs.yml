@@ -44,3 +44,5 @@ nav:
       - 游戏: domains/game.md
       - 投资: domains/investment.md
       - 写作: domains/writing.md
+  - 整理报告:
+      - 学习库整理试跑 2026-06-27: reports/2026-06-27-learning-vault-maintenance.md
